@@ -12,8 +12,7 @@ import { Button } from "@/components/ui/button";
 import { searchTokensFn } from "@/lib/analyze.functions";
 import { EVM_ADDRESS, SOLANA_ADDRESS, type Chain } from "@/lib/rug-model";
 import {
-  SEARCH_MIN_LENGTH,
-  normalizeSearchQuery,
+  classifyTokenInput,
   type TokenSearchResult,
 } from "@/lib/token-search";
 
@@ -46,8 +45,6 @@ const EXAMPLES: { label: string; address: string; chain: ChainChoice }[] = [
 
 const SEARCH_DEBOUNCE_MS = 300;
 
-const isAddress = (v: string) => EVM_ADDRESS.test(v) || SOLANA_ADDRESS.test(v);
-
 function useDebouncedValue<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -71,10 +68,11 @@ export function AnalyzeForm({
   const [focused, setFocused] = useState(false);
   const listId = useId();
 
-  const trimmed = input.trim();
-  const searchText = normalizeSearchQuery(trimmed);
-  const isSearching =
-    !isAddress(trimmed) && searchText.length >= SEARCH_MIN_LENGTH;
+  // Pasted links, stray punctuation and invisible characters still resolve to the address;
+  // half-typed addresses get a hint instead of being sent to name search.
+  const parsed = classifyTokenInput(input);
+  const searchText = parsed.kind === "search" ? parsed.query : "";
+  const isSearching = parsed.kind === "search";
   const debouncedQuery = useDebouncedValue(searchText, SEARCH_DEBOUNCE_MS);
   const searchEnabled = isSearching && debouncedQuery === searchText;
 
@@ -138,7 +136,16 @@ export function AnalyzeForm({
       }
       return;
     }
-    submitAddress(trimmed, chain);
+    if (parsed.kind === "partial") {
+      setError(parsed.message);
+      return;
+    }
+    if (parsed.kind === "address") {
+      if (parsed.extracted) setInput(parsed.address);
+      submitAddress(parsed.address, chain);
+      return;
+    }
+    submitAddress(input.trim(), chain);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -215,7 +222,7 @@ export function AnalyzeForm({
             role="combobox"
             spellCheck={false}
             autoComplete="off"
-            maxLength={64}
+            maxLength={400}
             className="min-w-0 flex-1 bg-transparent px-3 py-3 font-mono text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
           />
           <Button
@@ -241,8 +248,8 @@ export function AnalyzeForm({
             {searchEnabled && searchQuery.isError && (
               <div className="flex items-center justify-between gap-4 px-4 py-3">
                 <p className="text-sm text-destructive">
-                  Token search couldn't load. Check your connection and try
-                  again.
+                  Name search isn't available right now. You can still paste
+                  the token's full contract address.
                 </p>
                 <Button
                   type="button"
@@ -310,7 +317,15 @@ export function AnalyzeForm({
         )}
       </div>
 
-      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+      {error ? (
+        <p className="mt-2 text-sm text-destructive">{error}</p>
+      ) : parsed.kind === "partial" ? (
+        <p className="mt-2 text-sm text-muted-foreground">{parsed.message}</p>
+      ) : parsed.kind === "address" && parsed.extracted ? (
+        <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+          Found address {parsed.address.slice(0, 6)}…{parsed.address.slice(-4)} in what you pasted.
+        </p>
+      ) : null}
 
       <p className="mt-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
         Ethereum and BNB Chain search hasn't been implemented yet. Search
