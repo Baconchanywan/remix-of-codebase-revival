@@ -7,6 +7,7 @@ import {
   Check,
   Copy,
   ExternalLink,
+  FlaskConical,
   History,
   Loader2,
   Share2,
@@ -14,7 +15,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { explainRisk, type AnalysisResult } from "@/lib/analyze.functions";
-import { CHAIN_LABELS, PATTERN_LABELS, type Factor } from "@/lib/rug-model";
+import { CHAIN_LABELS, PATTERN_LABELS, VERDICT_LABELS, type Factor } from "@/lib/rug-model";
+import { estimateProject } from "@/lib/project-model";
 import {
   METRIC_INFO,
   readAge,
@@ -87,6 +89,54 @@ function PanelTitle({
       {icon}
       {children}
     </h3>
+  );
+}
+
+function ResearchModelPanel({
+  chain,
+  holderCount,
+}: {
+  chain: AnalysisResult["signals"]["chain"];
+  holderCount: number | null;
+}) {
+  const result = estimateProject({ chain, holderCount });
+  if (!result.available) {
+    if (result.reason === "model_invalid") return null;
+    return (
+      <p className="text-center font-mono text-[11px] text-muted-foreground">
+        Research model: not available{" "}
+        {result.reason === "unsupported_chain"
+          ? "for Solana. Its training data covers Ethereum and BNB Chain projects."
+          : "because the holder count couldn't be fetched."}
+      </p>
+    );
+  }
+  const e = result.estimate;
+  const style = VERDICT_STYLES[e.verdict];
+  return (
+    <Panel delay={0.08}>
+      <PanelTitle icon={<FlaskConical />}>Research model · second opinion</PanelTitle>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="shrink-0 text-center sm:w-36">
+          <p className={`font-display text-4xl font-extrabold tabular-nums ${style.text}`}>{e.score}%</p>
+          <p className={`font-mono text-[11px] uppercase tracking-widest ${style.text}`}>{VERDICT_LABELS[e.verdict]}</p>
+        </div>
+        <div className="space-y-2 text-sm leading-relaxed text-foreground/90">
+          <p>
+            Of projects like this one ({CHAIN_LABELS[chain]}, {e.holderCount.toLocaleString("en-US")} holders), about{" "}
+            <strong>{e.score}%</strong> were scams in a research dataset of 1,000 hand-labelled projects.
+          </p>
+          <p className="text-muted-foreground">
+            This logistic model only sees the chain and holder count, so it mainly measures how established a project
+            is. New legitimate tokens can score high too. The main score above checks the contract itself.
+          </p>
+          <p className="font-mono text-[11px] text-muted-foreground">
+            Test ROC-AUC {e.testAuc.toFixed(2)} on the 150 newest projects · trained on {e.nTrain} · data: TS-RugPull
+            (Shoaei et al., 2026), CC BY-NC 4.0
+          </p>
+        </div>
+      </div>
+    </Panel>
   );
 }
 
@@ -577,6 +627,8 @@ export function ResultView({ result }: { result: AnalysisResult }) {
           </p>
         )}
       </Panel>
+
+      <ResearchModelPanel chain={s.chain} holderCount={s.holderCount} />
 
       {/* Factor impact chart */}
       {(risk.redFlags.length > 0 || risk.greenFlags.length > 0) && (

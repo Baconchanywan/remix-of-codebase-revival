@@ -33,3 +33,6 @@ dist-ssr
 
 # ML pipeline raw data
 /ml/data
+
+# Python bytecode
+__pycache__/
