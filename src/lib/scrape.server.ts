@@ -55,7 +55,7 @@ async function viaFirecrawl(url: string, key: string): Promise<ScrapedPage | nul
 async function viaFetch(url: string): Promise<ScrapedPage | null> {
   try {
     const res = await fetch(url, {
-      headers: { accept: "text/html,text/plain", "user-agent": "Mozilla/5.0 (compatible; RugscopeBot/1.0)" },
+      headers: { accept: "text/html,text/plain", "user-agent": "Mozilla/5.0 (compatible; UnruggableBot/1.0)" },
       signal: AbortSignal.timeout(TIMEOUT_MS),
       redirect: "follow",
     });

@@ -5,6 +5,11 @@ import {
   type Chain,
   type TokenSignals,
 } from "./rug-model";
+import {
+  normalizeSearchResults,
+  type SearchPairInput,
+  type TokenSearchResult,
+} from "./token-search";
 
 const TIMEOUT_MS = 9000;
 const DEAD = new Set([
@@ -33,7 +38,8 @@ async function getJson(url: string): Promise<unknown> {
   }
 }
 
-const isObj = (v: unknown): v is Json => typeof v === "object" && v !== null && !Array.isArray(v);
+const isObj = (v: unknown): v is Json =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
 const num = (v: unknown): number | null => {
   if (v === null || v === undefined || v === "") return null;
   const n = typeof v === "number" ? v : Number(v);
@@ -44,7 +50,8 @@ const flag = (v: unknown): boolean | null => {
   if (v === "0" || v === 0 || v === false) return false;
   return null;
 };
-const str = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v : null);
+const str = (v: unknown): string | null =>
+  typeof v === "string" && v.length > 0 ? v : null;
 
 interface DexPair {
   chainId: string;
@@ -62,20 +69,39 @@ interface DexPair {
 }
 
 async function fetchDexPairs(address: string): Promise<DexPair[]> {
-  const data = await getJson(`https://api.dexscreener.com/latest/dex/tokens/${encodeURIComponent(address)}`);
+  const data = await getJson(
+    `https://api.dexscreener.com/latest/dex/tokens/${encodeURIComponent(address)}`,
+  );
   if (!isObj(data) || !Array.isArray(data["pairs"])) return [];
   return (data["pairs"] as DexPair[]).filter(
     (p) => p.baseToken?.address?.toLowerCase() === address.toLowerCase(),
   );
 }
 
+/** Search DexScreener by token name or symbol. Solana only for now. */
+export async function searchTokens(
+  query: string,
+): Promise<TokenSearchResult[]> {
+  const data = await getJson(
+    `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(query)}`,
+  );
+  if (!isObj(data) || !Array.isArray(data["pairs"])) {
+    throw new Error("Token search is unavailable right now.");
+  }
+  return normalizeSearchResults(data["pairs"] as SearchPairInput[]);
+}
+
 /** Pick the chain where this token has the most liquidity. */
-export async function detectChain(address: string): Promise<{ chain: Chain; pairs: DexPair[] }> {
-  if (!EVM_ADDRESS.test(address)) return { chain: "solana", pairs: await fetchDexPairs(address) };
+export async function detectChain(
+  address: string,
+): Promise<{ chain: Chain; pairs: DexPair[] }> {
+  if (!EVM_ADDRESS.test(address))
+    return { chain: "solana", pairs: await fetchDexPairs(address) };
   const pairs = await fetchDexPairs(address);
   const liq: Record<"ethereum" | "bsc", number> = { ethereum: 0, bsc: 0 };
   for (const p of pairs) {
-    if (p.chainId === "ethereum" || p.chainId === "bsc") liq[p.chainId] += p.liquidity?.usd ?? 0;
+    if (p.chainId === "ethereum" || p.chainId === "bsc")
+      liq[p.chainId] += p.liquidity?.usd ?? 0;
   }
   return { chain: liq.bsc > liq.ethereum ? "bsc" : "ethereum", pairs };
 }
@@ -84,8 +110,12 @@ function applyDex(s: TokenSignals, pairs: DexPair[]) {
   const allPairs = pairs.filter((p) => p.chainId === s.chain);
   if (allPairs.length === 0) return [];
   // Drop mispriced pools (bad quote-token pricing inflates liquidity / market cap).
-  const prices = allPairs.map((p) => num(p.priceUsd)).filter((n): n is number => n !== null && n > 0).sort((a, b) => a - b);
-  const median = prices.length > 0 ? prices[Math.floor(prices.length / 2)]! : null;
+  const prices = allPairs
+    .map((p) => num(p.priceUsd))
+    .filter((n): n is number => n !== null && n > 0)
+    .sort((a, b) => a - b);
+  const median =
+    prices.length > 0 ? prices[Math.floor(prices.length / 2)]! : null;
   const chainPairs =
     median === null
       ? allPairs
@@ -93,20 +123,30 @@ function applyDex(s: TokenSignals, pairs: DexPair[]) {
           const pr = num(p.priceUsd);
           return pr === null || (pr / median < 3 && median / pr < 3);
         });
-  const sorted = [...chainPairs].sort((a, b) => (b.volume?.h24 ?? 0) - (a.volume?.h24 ?? 0));
+  const sorted = [...chainPairs].sort(
+    (a, b) => (b.volume?.h24 ?? 0) - (a.volume?.h24 ?? 0),
+  );
   const top = sorted[0]!;
   s.name = top.baseToken?.name ?? s.name;
   s.symbol = top.baseToken?.symbol ?? s.symbol;
   s.imageUrl = top.info?.imageUrl ?? null;
   s.dexUrl = top.url ?? null;
   s.priceUsd = num(top.priceUsd);
-  s.liquidityUsd = chainPairs.reduce((sum, p) => sum + (p.liquidity?.usd ?? 0), 0);
+  s.liquidityUsd = chainPairs.reduce(
+    (sum, p) => sum + (p.liquidity?.usd ?? 0),
+    0,
+  );
   s.marketCapUsd = num(top.marketCap) ?? num(top.fdv);
   s.priceChange24h = num(top.priceChange?.h24);
   s.volume24hUsd = chainPairs.reduce((sum, p) => sum + (p.volume?.h24 ?? 0), 0);
-  const created = chainPairs.map((p) => p.pairCreatedAt).filter((t): t is number => typeof t === "number");
-  if (created.length > 0) s.pairAgeDays = (Date.now() - Math.min(...created)) / 86_400_000;
-  return chainPairs.map((p) => p.pairAddress?.toLowerCase()).filter((a): a is string => !!a);
+  const created = chainPairs
+    .map((p) => p.pairCreatedAt)
+    .filter((t): t is number => typeof t === "number");
+  if (created.length > 0)
+    s.pairAgeDays = (Date.now() - Math.min(...created)) / 86_400_000;
+  return chainPairs
+    .map((p) => p.pairAddress?.toLowerCase())
+    .filter((a): a is string => !!a);
 }
 
 function topHolderPct(holders: unknown, exclude: Set<string>): number | null {
@@ -115,7 +155,13 @@ function topHolderPct(holders: unknown, exclude: Set<string>): number | null {
   for (const h of holders.slice(0, 10)) {
     if (!isObj(h)) continue;
     const addr = (str(h["address"]) ?? str(h["account"]) ?? "").toLowerCase();
-    if (h["is_locked"] === 1 || DEAD.has(addr) || exclude.has(addr) || str(h["tag"])) continue;
+    if (
+      h["is_locked"] === 1 ||
+      DEAD.has(addr) ||
+      exclude.has(addr) ||
+      str(h["tag"])
+    )
+      continue;
     total += (num(h["percent"]) ?? 0) * 100;
   }
   return Math.min(100, total);
@@ -138,7 +184,10 @@ async function applyGoPlusEvm(s: TokenSignals, pairAddrs: string[]) {
   const sell = num(t["sell_tax"]);
   s.buyTaxPct = buy === null ? null : buy * 100;
   s.sellTaxPct = sell === null ? null : sell * 100;
-  s.isHoneypot = flag(t["is_honeypot"]) || flag(t["cannot_sell_all"]) ? true : flag(t["is_honeypot"]);
+  s.isHoneypot =
+    flag(t["is_honeypot"]) || flag(t["cannot_sell_all"])
+      ? true
+      : flag(t["is_honeypot"]);
   s.cannotBuy = flag(t["cannot_buy"]);
   s.ownerCanChangeBalance = flag(t["owner_change_balance"]);
   s.hiddenOwner = flag(t["hidden_owner"]);
@@ -149,7 +198,10 @@ async function applyGoPlusEvm(s: TokenSignals, pairAddrs: string[]) {
   s.mintable = mintable === null ? null : mintable && !renounced;
   s.transferPausable = flag(t["transfer_pausable"]);
   s.hasBlacklist = flag(t["is_blacklisted"]);
-  s.taxModifiable = flag(t["slippage_modifiable"]) || flag(t["personal_slippage_modifiable"]) ? true : flag(t["slippage_modifiable"]);
+  s.taxModifiable =
+    flag(t["slippage_modifiable"]) || flag(t["personal_slippage_modifiable"])
+      ? true
+      : flag(t["slippage_modifiable"]);
   s.isProxy = flag(t["is_proxy"]);
   s.openSource = flag(t["is_open_source"]);
   s.selfDestruct = flag(t["selfdestruct"]);
@@ -159,10 +211,13 @@ async function applyGoPlusEvm(s: TokenSignals, pairAddrs: string[]) {
   s.cexListed = isObj(cex) ? flag(cex["listed"]) : null;
   const creatorPct = num(t["creator_percent"]);
   const ownerPct = num(t["owner_percent"]);
-  if (creatorPct !== null || ownerPct !== null) s.creatorPct = Math.max(creatorPct ?? 0, ownerPct ?? 0) * 100;
+  if (creatorPct !== null || ownerPct !== null)
+    s.creatorPct = Math.max(creatorPct ?? 0, ownerPct ?? 0) * 100;
 
   const dexAddrs = Array.isArray(t["dex"])
-    ? (t["dex"] as unknown[]).map((d) => (isObj(d) ? (str(d["pair"]) ?? "").toLowerCase() : "")).filter(Boolean)
+    ? (t["dex"] as unknown[])
+        .map((d) => (isObj(d) ? (str(d["pair"]) ?? "").toLowerCase() : ""))
+        .filter(Boolean)
     : [];
   s.top10Pct = topHolderPct(t["holders"], new Set([...pairAddrs, ...dexAddrs]));
 
@@ -172,7 +227,11 @@ async function applyGoPlusEvm(s: TokenSignals, pairAddrs: string[]) {
     for (const h of lp) {
       if (!isObj(h)) continue;
       const addr = (str(h["address"]) ?? "").toLowerCase();
-      if (h["is_locked"] === 1 || DEAD.has(addr) || addr === s.address.toLowerCase()) {
+      if (
+        h["is_locked"] === 1 ||
+        DEAD.has(addr) ||
+        addr === s.address.toLowerCase()
+      ) {
         locked += (num(h["percent"]) ?? 0) * 100;
       }
     }
@@ -204,14 +263,21 @@ async function applyGoPlusSolana(s: TokenSignals) {
   s.closable = status("closable");
   s.metadataMutable = status("metadata_mutable");
   s.nonTransferable = flag(t["non_transferable"]);
-  s.transferHook = Array.isArray(t["transfer_hook"]) ? t["transfer_hook"].length > 0 : null;
-  s.trusted = t["trusted_token"] === 1 ? true : t["trusted_token"] === 0 ? false : null;
+  s.transferHook = Array.isArray(t["transfer_hook"])
+    ? t["transfer_hook"].length > 0
+    : null;
+  s.trusted =
+    t["trusted_token"] === 1 ? true : t["trusted_token"] === 0 ? false : null;
   s.openSource = true; // SPL tokens use the audited token program.
   const fee = t["transfer_fee"];
   if (isObj(fee)) {
-    const current = isObj(fee["current_fee_rate"]) ? (fee["current_fee_rate"] as Json) : fee;
-    const bps = num(current["fee_rate"]) ?? num(current["transfer_fee_basis_points"]);
-    s.sellTaxPct = Object.keys(fee).length === 0 ? 0 : bps === null ? null : bps / 100;
+    const current = isObj(fee["current_fee_rate"])
+      ? (fee["current_fee_rate"] as Json)
+      : fee;
+    const bps =
+      num(current["fee_rate"]) ?? num(current["transfer_fee_basis_points"]);
+    s.sellTaxPct =
+      Object.keys(fee).length === 0 ? 0 : bps === null ? null : bps / 100;
     s.buyTaxPct = s.sellTaxPct;
   }
   s.top10Pct = topHolderPct(t["holders"], new Set());
@@ -219,7 +285,9 @@ async function applyGoPlusSolana(s: TokenSignals) {
 }
 
 async function applyRugCheck(s: TokenSignals) {
-  const data = await getJson(`https://api.rugcheck.xyz/v1/tokens/${s.address}/report/summary`);
+  const data = await getJson(
+    `https://api.rugcheck.xyz/v1/tokens/${s.address}/report/summary`,
+  );
   if (!isObj(data)) return;
   s.externalRiskScore = num(data["score_normalised"]);
   const lp = num(data["lpLockedPct"]);
@@ -264,12 +332,18 @@ export interface GatheredToken {
   sources: string[];
 }
 
-export async function gatherTokenSignals(address: string, chainHint: Chain | "auto"): Promise<GatheredToken> {
+export async function gatherTokenSignals(
+  address: string,
+  chainHint: Chain | "auto",
+): Promise<GatheredToken> {
   const isEvm = EVM_ADDRESS.test(address);
   const isSol = SOLANA_ADDRESS.test(address);
-  if (!isEvm && !isSol) throw new Error("That doesn't look like a valid contract address.");
-  if (chainHint === "solana" && isEvm) throw new Error("That's an Ethereum/BNB address, not a Solana one.");
-  if (chainHint !== "auto" && chainHint !== "solana" && !isEvm) throw new Error("Ethereum and BNB Chain addresses start with 0x.");
+  if (!isEvm && !isSol)
+    throw new Error("That doesn't look like a valid contract address.");
+  if (chainHint === "solana" && isEvm)
+    throw new Error("That's an Ethereum/BNB address, not a Solana one.");
+  if (chainHint !== "auto" && chainHint !== "solana" && !isEvm)
+    throw new Error("Ethereum and BNB Chain addresses start with 0x.");
 
   let chain: Chain;
   let pairs: DexPair[];
@@ -294,7 +368,9 @@ export async function gatherTokenSignals(address: string, chainHint: Chain | "au
   }
 
   if (sources.length === 0) {
-    throw new Error("We couldn't find any trading or contract data for this token on that chain.");
+    throw new Error(
+      "No trading or contract data found for this address on that chain. Check the address and chain, or search by name.",
+    );
   }
   return { signals: s, sources };
 }

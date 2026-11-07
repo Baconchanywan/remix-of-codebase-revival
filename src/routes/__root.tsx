@@ -81,12 +81,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Rugscope — Rug pull risk checker" },
+      { title: "Unruggable — Rug pull risk checker" },
       {
         name: "description",
         content: "Paste a token contract and see how closely it matches historical crypto rug pulls.",
       },
-      { property: "og:title", content: "Rugscope — Rug pull risk checker" },
+      { property: "og:title", content: "Unruggable — Rug pull risk checker" },
       {
         property: "og:description",
         content: "Paste a token contract and see how closely it matches historical crypto rug pulls.",
