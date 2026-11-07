@@ -226,6 +226,39 @@ async function applyRugCheck(s: TokenSignals) {
   if (lp !== null) s.lpLockedPct = lp;
 }
 
+export interface TickerMatch {
+  address: string;
+  chain: Chain;
+  name: string | null;
+  liquidityUsd: number;
+  /** How many distinct contracts on supported chains use this exact ticker (copycat signal). */
+  sameTickerCount: number;
+}
+
+/**
+ * Resolve a bare $TICKER to the most liquid contract using it on a supported chain.
+ * Returns null if nothing matches exactly.
+ */
+export async function searchTicker(ticker: string): Promise<TickerMatch | null> {
+  const data = await getJson(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(ticker)}`);
+  if (!isObj(data) || !Array.isArray(data["pairs"])) return null;
+  const supported = new Set<string>(["ethereum", "bsc", "solana"]);
+  const byToken = new Map<string, TickerMatch>();
+  for (const p of data["pairs"] as DexPair[]) {
+    const addr = p.baseToken?.address;
+    if (!addr || !supported.has(p.chainId)) continue;
+    if ((p.baseToken?.symbol ?? "").toUpperCase() !== ticker.toUpperCase()) continue;
+    const key = `${p.chainId}:${addr.toLowerCase()}`;
+    const prev = byToken.get(key);
+    const liq = p.liquidity?.usd ?? 0;
+    if (prev) prev.liquidityUsd += liq;
+    else byToken.set(key, { address: addr, chain: p.chainId as Chain, name: p.baseToken?.name ?? null, liquidityUsd: liq, sameTickerCount: 0 });
+  }
+  const all = [...byToken.values()].sort((a, b) => b.liquidityUsd - a.liquidityUsd);
+  const top = all[0];
+  return top ? { ...top, sameTickerCount: all.length } : null;
+}
+
 export interface GatheredToken {
   signals: TokenSignals;
   sources: string[];
