@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertCircle, Radar } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { AnalyzeForm, type ChainChoice } from "@/components/rug/AnalyzeForm";
 import { Button } from "@/components/ui/button";
 import { ResultView } from "@/components/rug/ResultView";
@@ -72,14 +72,13 @@ function Index() {
   return (
     <div className="min-h-screen">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
-        <div className="flex items-center gap-2.5">
-          <span className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <Radar className="size-5" />
-          </span>
-          <span className="font-display text-lg font-extrabold tracking-tight">
-            UNRUGGABLE
-          </span>
-        </div>
+        <img
+          src="/unruggable-logo-light.png"
+          alt="Unruggable"
+          width={692}
+          height={131}
+          className="h-7 w-auto md:h-8"
+        />
         <span className="hidden items-center gap-2 rounded-full border border-border px-3 py-1 font-mono text-[11px] uppercase tracking-widest text-muted-foreground sm:flex">
           <span className="size-1.5 rounded-full bg-primary" />
           Live data
