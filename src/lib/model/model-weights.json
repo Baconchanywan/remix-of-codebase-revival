@@ -1,0 +1,38 @@
+{
+  "version": "untrained",
+  "label_rules_version": "v1",
+  "trained_at": "2026-11-07T00:00:00Z",
+  "n_train": 0,
+  "n_val": 0,
+  "n_test": 0,
+  "feature_order": [
+    "creator_prev_token_count",
+    "creator_prev_rug_rate",
+    "creator_prev_rug_rate_missing",
+    "creator_wallet_age_days",
+    "creator_wallet_age_missing",
+    "creator_tx_count_pre_launch",
+    "funder_is_known_bad",
+    "funder_rugged_creator_count",
+    "funder_missing",
+    "mint_authority_revoked_at_launch",
+    "mint_authority_revoked_at_launch_missing",
+    "freeze_authority_revoked_at_launch",
+    "freeze_authority_revoked_at_launch_missing",
+    "buyers_first_hour",
+    "buyer_funder_overlap",
+    "buyer_funder_overlap_missing"
+  ],
+  "means": [],
+  "stds": [],
+  "coef": [],
+  "intercept": 0,
+  "calibration": { "type": "isotonic", "x": [], "y": [] },
+  "metrics": {
+    "roc_auc": 0,
+    "brier": 0,
+    "precision_at_threshold": 0,
+    "recall_at_threshold": 0
+  },
+  "threshold": 0.5
+}

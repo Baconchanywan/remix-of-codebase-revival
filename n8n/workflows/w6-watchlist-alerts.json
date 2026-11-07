@@ -1,0 +1,125 @@
+{
+  "name": "UnRuggable W6 - Watchlist alerts",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "w6-trigger",
+      "name": "Every 15 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://project--6ea691b4-6d72-4909-8327-9db061692868.lovable.app/api/public/pipeline/watchlist-alerts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "w6-query",
+      "name": "Find material drops",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "UnRuggable pipeline"
+        }
+      },
+      "notes": "Uses the 'UnRuggable pipeline' Header Auth credential (Name: Authorization, Value: Bearer <PIPELINE_API_TOKEN>)."
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(({ json }) => ({ json: { message: `UnRuggable alert: ${json.mint} trust changed to ${json.trust}% (baseline ${json.baseline_trust}%). Review the token before acting.` } }));"
+      },
+      "id": "w6-message",
+      "name": "Format alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "REPLACE_WITH_TELEGRAM_CHAT_ID",
+        "text": "={{$json.message}}"
+      },
+      "id": "w6-telegram",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        680,
+        0
+      ],
+      "notes": "Attach a Telegram credential. Replace the chat ID."
+    }
+  ],
+  "connections": {
+    "Every 15 minutes": {
+      "main": [
+        [
+          {
+            "node": "Find material drops",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find material drops": {
+      "main": [
+        [
+          {
+            "node": "Format alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format alert": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "unruggable-w6-v1"
+}

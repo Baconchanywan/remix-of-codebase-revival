@@ -1,0 +1,150 @@
+{
+  "name": "UnRuggable W2 - Snapshot at one hour",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "w2-trigger",
+      "name": "Every 10 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://project--6ea691b4-6d72-4909-8327-9db061692868.lovable.app/api/public/pipeline/snapshots-due",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "25"
+            }
+          ]
+        }
+      },
+      "id": "w2-select",
+      "name": "Select due snapshots",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "UnRuggable pipeline"
+        }
+      },
+      "notes": "Uses the 'UnRuggable pipeline' Header Auth credential (Name: Authorization, Value: Bearer <PIPELINE_API_TOKEN>)."
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $json;\nif (!row.creator) throw new Error(`Cannot snapshot ${row.mint}: creator address is missing`);\nthrow new Error('Connect Helius creator history, buyer history, and RugCheck authority lookups before enabling W2. The workflow refuses to write placeholder zero features.');"
+      },
+      "id": "w2-feature",
+      "name": "Build schema-shaped snapshot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://project--6ea691b4-6d72-4909-8327-9db061692868.lovable.app/api/public/pipeline/snapshots",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ mint: $json.mint, decision_time: $json.decision_time, provider_observed_at: $json.provider_observed_at, features: $json.features, raw_provider_refs: { launch_time_source: $json.launch_time_source } }) }}"
+      },
+      "id": "w2-write",
+      "name": "Persist one-hour snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "UnRuggable pipeline"
+        }
+      },
+      "notes": "Uses the 'UnRuggable pipeline' Header Auth credential (Name: Authorization, Value: Bearer <PIPELINE_API_TOKEN>)."
+    }
+  ],
+  "connections": {
+    "Every 10 minutes": {
+      "main": [
+        [
+          {
+            "node": "Select due snapshots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select due snapshots": {
+      "main": [
+        [
+          {
+            "node": "Build schema-shaped snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build schema-shaped snapshot": {
+      "main": [
+        [
+          {
+            "node": "Persist one-hour snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "unruggable-w2-v1"
+}

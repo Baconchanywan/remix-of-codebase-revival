@@ -1,0 +1,150 @@
+{
+  "name": "UnRuggable W4 - Build known-bad lists",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "w4-trigger",
+      "name": "Daily",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://project--6ea691b4-6d72-4909-8327-9db061692868.lovable.app/api/public/pipeline/known-bad-candidates",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "min_funder_count",
+              "value": "2"
+            }
+          ]
+        }
+      },
+      "id": "w4-query",
+      "name": "Query training-period bad addresses",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "notes": "Uses the 'UnRuggable pipeline' Header Auth credential (Name: Authorization, Value: Bearer <PIPELINE_API_TOKEN>). Feed Helius-derived funder counts in first with POST /funders. Add a 'before' query parameter (ISO time) to restrict creators to the training period.",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "UnRuggable pipeline"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const allowlist = new Set((process.env.EXCHANGE_ALLOWLIST ?? '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean));\nconst creators = new Set();\nconst funders = new Set();\nfor (const item of $input.all()) {\n  const address = String(item.json.address ?? '').toLowerCase();\n  if (!address || allowlist.has(address)) continue;\n  if (item.json.address_type === 'creator') creators.add(address);\n  if (item.json.address_type === 'funder') funders.add(address);\n}\nreturn [{ json: { creators: [...creators].sort(), funders: [...funders].sort(), generated_from: 'v1', generated_at: new Date().toISOString() } }];"
+      },
+      "id": "w4-build",
+      "name": "Apply allowlist and threshold",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://project--6ea691b4-6d72-4909-8327-9db061692868.lovable.app/api/public/pipeline/known-bad",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ creators: $json.creators, funders: $json.funders, generated_from: $json.generated_from, generated_at: $json.generated_at }) }}"
+      },
+      "id": "w4-write",
+      "name": "Publish known-bad table",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "UnRuggable pipeline"
+        }
+      },
+      "notes": "Uses the 'UnRuggable pipeline' Header Auth credential (Name: Authorization, Value: Bearer <PIPELINE_API_TOKEN>)."
+    }
+  ],
+  "connections": {
+    "Daily": {
+      "main": [
+        [
+          {
+            "node": "Query training-period bad addresses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query training-period bad addresses": {
+      "main": [
+        [
+          {
+            "node": "Apply allowlist and threshold",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply allowlist and threshold": {
+      "main": [
+        [
+          {
+            "node": "Publish known-bad table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "unruggable-w4-v1"
+}

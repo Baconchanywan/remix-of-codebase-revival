@@ -1,0 +1,117 @@
+{
+  "source": "code-archive (UnRuggable.zip \u2014 an existing Lovable TanStack Start project)",
+  "capabilities": [
+    {
+      "capability": "code: rug-pull checker UI, scoring model, routes, theme",
+      "source": "src/",
+      "outcome": "migrate",
+      "status": "verified",
+      "next_action": "none"
+    },
+    {
+      "capability": "dependencies (@lovable.dev/ai-gateway, zod v4)",
+      "source": "package.json",
+      "outcome": "migrate",
+      "status": "verified",
+      "next_action": "none"
+    },
+    {
+      "capability": "live token data (DexScreener, GoPlus, RugCheck \u2014 keyless)",
+      "source": "src/lib/token-data.server.ts",
+      "outcome": "preserve",
+      "status": "verified",
+      "next_action": "none"
+    },
+    {
+      "capability": "AI explanation via Lovable AI Gateway",
+      "source": "src/lib/analyze.functions.ts",
+      "outcome": "preserve",
+      "status": "verified",
+      "next_action": "none"
+    },
+    {
+      "capability": "unit tests for scoring model",
+      "source": "src/test/rug-model.test.ts",
+      "outcome": "migrate",
+      "status": "verified",
+      "next_action": "none"
+    },
+    {
+      "capability": "schema",
+      "source": "n8n/schema.sql",
+      "outcome": "migrate (Lovable Cloud)",
+      "status": "verified",
+      "next_action": "none \u2014 6 server-only tables created; browser access verified blocked"
+    },
+    {
+      "capability": "records",
+      "source": "none",
+      "outcome": "not applicable",
+      "status": "verified",
+      "next_action": "none \u2014 app has no live database"
+    },
+    {
+      "capability": "auth identities / authorization",
+      "source": "none",
+      "outcome": "not applicable",
+      "status": "verified",
+      "next_action": "none \u2014 app has no sign-in"
+    },
+    {
+      "capability": "uploaded file bytes / storage",
+      "source": "none",
+      "outcome": "not applicable",
+      "status": "verified",
+      "next_action": "none"
+    },
+    {
+      "capability": "n8n workflows (discover, snapshot, label, known-bad, watchlist)",
+      "source": "n8n/",
+      "outcome": "preserve",
+      "status": "preserved",
+      "next_action": "optional: keep running in the user's n8n account (credentials stay in n8n)"
+    },
+    {
+      "capability": "ML training pipeline + weekly GitHub Actions schedule",
+      "source": "ml/, .github/workflows/train-model.yml",
+      "outcome": "preserve",
+      "status": "preserved",
+      "next_action": "optional: connect project to GitHub; TRAINING_DATA_URL stays a GitHub Actions secret"
+    },
+    {
+      "capability": "public endpoints / webhooks / callbacks",
+      "source": "none",
+      "outcome": "not applicable",
+      "status": "verified",
+      "next_action": "none"
+    },
+    {
+      "capability": "secrets",
+      "source": "LOVABLE_API_KEY (app); n8n + GitHub secrets live in those services",
+      "outcome": "preserve",
+      "status": "verified",
+      "next_action": "none"
+    },
+    {
+      "capability": "cutover",
+      "source": "-",
+      "outcome": "none required",
+      "status": "verified",
+      "next_action": "none"
+    },
+    {
+      "capability": "verification",
+      "source": "-",
+      "outcome": "verify",
+      "status": "verified",
+      "next_action": "none"
+    },
+    {
+      "capability": "n8n \u2192 database connection",
+      "source": "n8n Postgres nodes",
+      "outcome": "pending",
+      "status": "pending",
+      "next_action": "n8n cannot connect directly to the database; needs a secured app endpoint that n8n calls to read/write these tables"
+    }
+  ]
+}

@@ -1,0 +1,154 @@
+{
+  "name": "UnRuggable W1 - Discover Solana tokens",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "w1-trigger",
+      "name": "Every 10 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://public-api.birdeye.so/defi/v3/token/list",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "chain",
+              "value": "solana"
+            },
+            {
+              "name": "sort_by",
+              "value": "recent_listing_time"
+            },
+            {
+              "name": "sort_type",
+              "value": "desc"
+            },
+            {
+              "name": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "w1-birdeye",
+      "name": "Birdeye recent tokens",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "notes": "Attach a Header Auth credential named Birdeye API to this node."
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $json.data ?? $json.tokens ?? [];\nreturn rows.map((token) => ({ json: {\n  mint: token.address ?? token.token_address,\n  launch_time: token.listingTime ?? token.createdAt ?? token.launch_time,\n  launch_time_source: token.listingTime ? 'birdeye_listing_time' : 'birdeye_token_time',\n  creator: token.creatorAddress ?? null,\n  pair_address: token.pairAddress ?? null,\n  snapshot_due_at: new Date(new Date(token.listingTime ?? token.createdAt).getTime() + 60 * 60 * 1000).toISOString()\n} })).filter((item) => item.json.mint && item.json.launch_time);"
+      },
+      "id": "w1-normalize",
+      "name": "Normalize token rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://project--6ea691b4-6d72-4909-8327-9db061692868.lovable.app/api/public/pipeline/tokens",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "w1-write",
+      "name": "Insert token idempotently",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        0
+      ],
+      "notes": "Uses the 'UnRuggable pipeline' Header Auth credential (Name: Authorization, Value: Bearer <PIPELINE_API_TOKEN>).",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "UnRuggable pipeline"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 10 minutes": {
+      "main": [
+        [
+          {
+            "node": "Birdeye recent tokens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Birdeye recent tokens": {
+      "main": [
+        [
+          {
+            "node": "Normalize token rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize token rows": {
+      "main": [
+        [
+          {
+            "node": "Insert token idempotently",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "unruggable-w1-v1"
+}

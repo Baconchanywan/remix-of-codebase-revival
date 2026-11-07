@@ -1,0 +1,150 @@
+{
+  "name": "UnRuggable W3 - Label outcomes",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "w3-trigger",
+      "name": "Daily",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://project--6ea691b4-6d72-4909-8327-9db061692868.lovable.app/api/public/pipeline/outcomes-due",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "100"
+            }
+          ]
+        }
+      },
+      "id": "w3-select",
+      "name": "Select mature tokens",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "UnRuggable pipeline"
+        }
+      },
+      "notes": "Uses the 'UnRuggable pipeline' Header Auth credential (Name: Authorization, Value: Bearer <PIPELINE_API_TOKEN>)."
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $json;\n// Replace this placeholder with the joined Birdeye/DexScreener history.\n// Never label from a single current-price response.\nif (!row.history || !Array.isArray(row.history)) return [{ json: { ...row, label: null, status: 'excluded_insufficient_data', reason_code: 'missing_history', label_rules_version: 'v1' } }];\nconst peak = Math.max(...row.history.map((p) => Number(p.value)).filter(Number.isFinite));\nconst early = row.history.filter((p) => Number(p.days) <= 7).map((p) => Number(p.value)).filter(Number.isFinite);\nconst at30 = row.history.find((p) => Number(p.days) >= 30)?.value;\nconst rugged = peak >= 5000 && (Math.min(...early) <= peak * 0.1 || row.confirmed_lp_removal === true);\nconst survived = peak >= 5000 && Number(at30) >= peak * 0.5;\nconst status = rugged ? 'rugged' : survived ? 'survived' : 'excluded_ambiguous';\nreturn [{ json: { ...row, label: rugged ? 1 : survived ? 0 : null, status, reason_code: rugged || survived ? null : 'ambiguous_slow_bleed', label_rules_version: 'v1' } }];"
+      },
+      "id": "w3-label",
+      "name": "Apply v1 label rules",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://project--6ea691b4-6d72-4909-8327-9db061692868.lovable.app/api/public/pipeline/labels",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ mint: $json.mint, label: $json.label ?? null, status: $json.status, reason_code: $json.reason_code ?? null, label_rules_version: $json.label_rules_version, peak_liquidity_usd: $json.peak ?? null, value_at_30d: $json.at30 ?? null }) }}"
+      },
+      "id": "w3-write",
+      "name": "Write label",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "UnRuggable pipeline"
+        }
+      },
+      "notes": "Uses the 'UnRuggable pipeline' Header Auth credential (Name: Authorization, Value: Bearer <PIPELINE_API_TOKEN>)."
+    }
+  ],
+  "connections": {
+    "Daily": {
+      "main": [
+        [
+          {
+            "node": "Select mature tokens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select mature tokens": {
+      "main": [
+        [
+          {
+            "node": "Apply v1 label rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply v1 label rules": {
+      "main": [
+        [
+          {
+            "node": "Write label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "unruggable-w3-v1"
+}
