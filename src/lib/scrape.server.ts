@@ -79,7 +79,7 @@ async function viaFetch(url: string): Promise<ScrapedPage | null> {
 
 export async function scrapeUrl(url: string): Promise<ScrapedPage | null> {
   if (!isPublicUrl(url)) return null;
-  const key = process.env.FIRECRAWL_API_KEY;
+  const key = process.env["FIRECRAWL_API_KEY"];
   if (key) {
     const page = await viaFirecrawl(url, key);
     if (page) return page;
